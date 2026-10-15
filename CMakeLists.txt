@@ -10,6 +10,7 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 find_package(Qt6 6.5 REQUIRED COMPONENTS Quick Sql)
 
 qt_standard_project_setup()
+qt_policy(SET QTP0001 NEW)   # QML module resources under :/qt/qml/ so loadFromModule can find them
 
 set_source_files_properties(
     qml/theme/Theme.qml

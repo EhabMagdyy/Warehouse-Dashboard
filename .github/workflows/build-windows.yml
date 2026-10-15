@@ -21,16 +21,18 @@ jobs:
           cache: true
 
       - name: Configure
-        run: cmake -S . -B build -DCMAKE_BUILD_TYPE=Release -DCMAKE_PREFIX_PATH="$env:QT_ROOT_DIR"
+        run: cmake -S . -B "${{ runner.temp }}/build" -DCMAKE_BUILD_TYPE=Release -DCMAKE_PREFIX_PATH="$env:QT_ROOT_DIR"
 
       - name: Build
-        run: cmake --build build --config Release
+        run: cmake --build "${{ runner.temp }}/build" --config Release
 
       - name: Collect Qt DLLs, plugins and QML modules
         run: |
           New-Item -ItemType Directory dist | Out-Null
-          Copy-Item build/Release/appWarehouseDashboard.exe dist/
+          Copy-Item "${{ runner.temp }}/build/Release/appWarehouseDashboard.exe" dist/
           windeployqt --qmldir . --release --compiler-runtime dist/appWarehouseDashboard.exe
+          # the app carries its own QML module inside the exe; a stray copy on disk would shadow it
+          Remove-Item -Recurse -Force dist/qml/WarehouseDashboard -ErrorAction SilentlyContinue
 
       - name: Upload
         uses: actions/upload-artifact@v4
