@@ -1,0 +1,39 @@
+name: Build Windows
+
+on:
+  push:
+    branches: [main, master]
+  workflow_dispatch:        # lets you press "Run workflow" manually
+
+jobs:
+  build:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Qt
+        uses: jurplel/install-qt-action@v4
+        with:
+          version: '6.10.2'
+          host: windows
+          target: desktop
+          arch: win64_msvc2022_64
+          cache: true
+
+      - name: Configure
+        run: cmake -S . -B build -DCMAKE_BUILD_TYPE=Release -DCMAKE_PREFIX_PATH="$env:QT_ROOT_DIR"
+
+      - name: Build
+        run: cmake --build build --config Release
+
+      - name: Collect Qt DLLs, plugins and QML modules
+        run: |
+          New-Item -ItemType Directory dist | Out-Null
+          Copy-Item build/Release/appWarehouseDashboard.exe dist/
+          windeployqt --qmldir . --release --compiler-runtime dist/appWarehouseDashboard.exe
+
+      - name: Upload
+        uses: actions/upload-artifact@v4
+        with:
+          name: WarehouseDashboard-windows
+          path: dist
