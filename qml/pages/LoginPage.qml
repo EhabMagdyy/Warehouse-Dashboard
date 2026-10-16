@@ -140,7 +140,7 @@ Item {
                     width: parent.width
                     horizontalAlignment: Text.AlignHCenter
                     text: root.setupMode
-                          ? qsTr("First access — create your master password and magic word")
+                          ? qsTr("Create your password and magic word")
                           : root.resetMode
                             ? qsTr("Enter your magic word to set a new password")
                             : qsTr("Enter your password to continue")
@@ -234,9 +234,9 @@ Item {
             GlassButton {
                 width: parent.width
                 primary: true
-                text: root.setupMode ? qsTr("CREATE & ENTER")
-                      : root.resetMode ? qsTr("CHANGE PASSWORD")
-                      : qsTr("AUTHENTICATE")
+                text: root.setupMode ? qsTr("Create & Enter")
+                      : root.resetMode ? qsTr("Change Password")
+                      : qsTr("Enter")
                 onClicked: root.attempt()
             }
 
@@ -265,12 +265,12 @@ Item {
         }
     }
 
-    // version tag
+    // copyright
     Label {
         anchors.bottom: parent.bottom
         anchors.horizontalCenter: parent.horizontalCenter
         anchors.bottomMargin: Theme.dp(20)
-        text: qsTr("Warehouse Management System")
+        text: qsTr("© %1 AFA Nozom Team.").arg(new Date().getFullYear())
         font.pixelSize: Theme.fontSizeSmall
         font.family: Theme.fontFamily
         color: Theme.textFaint

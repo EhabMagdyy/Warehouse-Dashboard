@@ -44,6 +44,9 @@ Item {
         color: Theme.textPrimary
         placeholderTextColor: Theme.textFaint
         horizontalAlignment: TextInput.AlignLeft   // keep Arabic input left-aligned like English
+        verticalAlignment: TextInput.AlignVCenter  // text and placeholder centred in the box
+        topPadding: 0
+        bottomPadding: 0
         echoMode: root.password ? TextInput.Password : TextInput.Normal
         background: Item {}
         onEditingFinished: root.editingFinished()

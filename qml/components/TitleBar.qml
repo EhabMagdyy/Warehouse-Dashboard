@@ -9,7 +9,8 @@ import "../theme"
 //       header: TitleBar {}
 //   }
 //
-// Drag the bar to move the window, double-click to maximize / restore.
+// The app only ever runs full screen or minimized, so the bar has just a
+// minimize (-) and a close button.
 Rectangle {
     id: bar
 
@@ -18,14 +19,6 @@ Rectangle {
 
     property string title: win ? win.title : ""
     property string iconName: "warehouse"
-
-    readonly property bool isWindowed: win && win.visibility === Window.Windowed
-    readonly property bool isFullScreen: win && win.visibility === Window.FullScreen
-
-    function toggleMaximized() {
-        if (!win) return
-        win.visibility = isWindowed ? Window.Maximized : (isFullScreen ? Window.Maximized : Window.Windowed)
-    }
 
     implicitHeight: Theme.dp(40)
 
@@ -44,21 +37,6 @@ Rectangle {
         anchors.right: parent.right
         height: 1
         color: Qt.rgba(Theme.primary.r, Theme.primary.g, Theme.primary.b, 0.30)
-    }
-
-    // --- drag / double-click area (sits under the buttons) ---
-    Item {
-        anchors.fill: parent
-
-        DragHandler {
-            target: null
-            enabled: !bar.isFullScreen
-            onActiveChanged: if (active && bar.win) bar.win.startSystemMove()
-        }
-        TapHandler {
-            acceptedButtons: Qt.LeftButton
-            onDoubleTapped: bar.toggleMaximized()
-        }
     }
 
     // --- title ---
@@ -120,10 +98,6 @@ Rectangle {
         WinButton {
             iconName: "minus"
             onClicked: if (bar.win) bar.win.showMinimized()
-        }
-        WinButton {
-            iconName: bar.isWindowed ? "window-maximize" : "window-restore"
-            onClicked: bar.toggleMaximized()
         }
         WinButton {
             iconName: "close"

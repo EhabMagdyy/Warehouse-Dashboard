@@ -16,6 +16,9 @@ class AppController : public QObject
     Q_PROPERTY(int selectedStockId READ selectedStockId NOTIFY selectedStockChanged)
     Q_PROPERTY(QString selectedStockName READ selectedStockName NOTIFY selectedStockChanged)
     Q_PROPERTY(int maxStocks READ maxStocks CONSTANT)
+    Q_PROPERTY(int maxCustomColumns READ maxCustomColumns CONSTANT)
+    Q_PROPERTY(int maxColumnNameLength READ maxColumnNameLength CONSTANT)
+    Q_PROPERTY(int maxColumnValue READ maxColumnValue CONSTANT)
     Q_PROPERTY(StockModel* stockModel READ stockModel CONSTANT)
     Q_PROPERTY(ItemModel* itemModel READ itemModel CONSTANT)
     Q_PROPERTY(ItemFilterModel* itemFilterModel READ itemFilterModel CONSTANT)
@@ -27,6 +30,13 @@ public:
 
     static constexpr int kMaxStocks = 16;
     int maxStocks() const { return kMaxStocks; }
+
+    static constexpr int kMaxCustomColumns = 3;      // per stock
+    static constexpr int kMaxColumnNameLength = 7;
+    static constexpr int kMaxColumnValue = 999;      // 3 digits
+    int maxCustomColumns() const { return kMaxCustomColumns; }
+    int maxColumnNameLength() const { return kMaxColumnNameLength; }
+    int maxColumnValue() const { return kMaxColumnValue; }
 
     bool passwordSet() const;
     int selectedStockId() const { return m_selectedStockId; }
@@ -53,6 +63,8 @@ public:
     Q_INVOKABLE bool updateItem(int itemId, const QString &name, const QString &notes);
     Q_INVOKABLE bool deleteItem(int itemId);
     Q_INVOKABLE bool adjustQuantity(int itemId, int delta, const QString &reason);
+    Q_INVOKABLE bool addColumn(const QString &name);   // custom column on the selected stock
+    Q_INVOKABLE bool adjustColumnValue(int itemId, int columnId, int delta, const QString &reason);
     Q_INVOKABLE void showHistory(int itemId);
 
 signals:

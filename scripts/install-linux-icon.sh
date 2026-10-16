@@ -1,9 +1,9 @@
 #!/usr/bin/env bash
 # Linux only: registers the app icon with the desktop (needed on Wayland / GNOME,
 # where the taskbar icon comes from a .desktop file, not from the program).
-# Usage: scripts/install-linux-icon.sh /path/to/appWarehouseDashboard
+# Usage: scripts/install-linux-icon.sh /path/to/WareDash
 set -e
-EXE="$(realpath "${1:?usage: $0 /path/to/appWarehouseDashboard}")"
+EXE="$(realpath "${1:?usage: $0 /path/to/WareDash}")"
 HERE="$(cd "$(dirname "$0")/.." && pwd)"
 APPS="$HOME/.local/share/applications"
 ICONS="$HOME/.local/share/icons/hicolor/256x256/apps"
@@ -19,7 +19,7 @@ Exec=$EXE
 Icon=WarehouseDashboard
 Terminal=false
 Categories=Office;
-StartupWMClass=appWarehouseDashboard
+StartupWMClass=WareDash
 DESKTOP
 
 update-desktop-database "$APPS" 2>/dev/null || true

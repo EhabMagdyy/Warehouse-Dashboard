@@ -66,7 +66,7 @@ Item {
                     spacing: 0
                     Label {
                         text: app.stockModel.count === 0
-                              ? qsTr("No stocks — create your first one")
+                              ? qsTr("No stocks")
                               : qsTr("%1 active stock(s)").arg(app.stockModel.count)
                         font.pixelSize: Theme.fontSizeBody
                         font.bold: true

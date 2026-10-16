@@ -17,6 +17,7 @@ public:
         ReasonRole,
         QuantityAfterRole,
         CreatedAtRole,
+        ColumnNameRole,   // "QTY" or the custom column's name
     };
 
     explicit HistoryModel(const QSqlDatabase &db, QObject *parent = nullptr);
@@ -39,6 +40,7 @@ private:
         QString reason;
         int quantityAfter;
         QString createdAt;
+        QString columnName;
     };
     QSqlDatabase m_db;
     QVector<Row> m_rows;

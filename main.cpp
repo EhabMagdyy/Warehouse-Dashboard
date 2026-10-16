@@ -10,9 +10,13 @@
 
 int main(int argc, char *argv[])
 {
+    // Same look on every OS: the Windows 11 default style changes paddings and fonts
+    if (qEnvironmentVariableIsEmpty("QT_QUICK_CONTROLS_STYLE"))
+        qputenv("QT_QUICK_CONTROLS_STYLE", "Basic");
+
     QGuiApplication app(argc, argv);
     QGuiApplication::setApplicationName("WarehouseDashboard");
-    QGuiApplication::setOrganizationName("AFA Nozom");
+    QGuiApplication::setOrganizationName("AFA_Nozom");
     // Wayland matches the window to its .desktop file (and so its icon) by this name
     QGuiApplication::setDesktopFileName(QStringLiteral("WarehouseDashboard"));
 

@@ -79,6 +79,3 @@ CMakeLists.txt.user*
 .rcc/
 .uic/
 /build*/
-
-.vscode*
-build/

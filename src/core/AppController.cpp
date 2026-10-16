@@ -237,9 +237,15 @@ bool AppController::deleteStock(int stockId)
     q.prepare(QStringLiteral("DELETE FROM transactions WHERE item_id IN (SELECT id FROM items WHERE stock_id = ?)"));
     q.addBindValue(stockId);
     const bool ok1 = q.exec();
+    q.prepare(QStringLiteral("DELETE FROM item_values WHERE item_id IN (SELECT id FROM items WHERE stock_id = ?)"));
+    q.addBindValue(stockId);
+    q.exec();
     q.prepare(QStringLiteral("DELETE FROM items WHERE stock_id = ?"));
     q.addBindValue(stockId);
     const bool ok2 = q.exec();
+    q.prepare(QStringLiteral("DELETE FROM custom_columns WHERE stock_id = ?"));
+    q.addBindValue(stockId);
+    q.exec();
     q.prepare(QStringLiteral("DELETE FROM stocks WHERE id = ?"));
     q.addBindValue(stockId);
     const bool ok3 = q.exec();
@@ -346,6 +352,9 @@ bool AppController::deleteItem(int itemId)
     q.prepare(QStringLiteral("DELETE FROM transactions WHERE item_id = ?"));
     q.addBindValue(itemId);
     const bool ok1 = q.exec();
+    q.prepare(QStringLiteral("DELETE FROM item_values WHERE item_id = ?"));
+    q.addBindValue(itemId);
+    q.exec();
     q.prepare(QStringLiteral("DELETE FROM items WHERE id = ?"));
     q.addBindValue(itemId);
     const bool ok2 = q.exec();
@@ -364,8 +373,14 @@ bool AppController::deleteItem(int itemId)
 
 bool AppController::adjustQuantity(int itemId, int delta, const QString &reason)
 {
-    if (reason.trimmed().isEmpty()) {
+    const QString trimmedReason = reason.trimmed();
+
+    if (trimmedReason.isEmpty()) {
         emit operationFailed(tr("A reason is required"));
+        return false;
+    }
+    if (trimmedReason.size() > 200) {
+        emit operationFailed(tr("Reason can be at most 200 characters"));
         return false;
     }
 
@@ -389,19 +404,152 @@ bool AppController::adjustQuantity(int itemId, int delta, const QString &reason)
     q.addBindValue(after);
     q.addBindValue(itemId);
     const bool ok1 = q.exec();
+
     q.prepare(QStringLiteral(
         "INSERT INTO transactions(item_id, delta, reason, quantity_after) VALUES(?, ?, ?, ?)"));
     q.addBindValue(itemId);
     q.addBindValue(delta);
+    q.addBindValue(trimmedReason);
+    q.addBindValue(after);
+    const bool ok2 = q.exec();
+
+    if (!ok1 || !ok2) {
+        m_db.rollback();
+        emit operationFailed(tr("Could not update quantity"));
+        return false;
+    }
+
+    // Keep only the latest 100 history records for this item
+    QSqlQuery prune(m_db);
+    prune.prepare(QStringLiteral(
+        "DELETE FROM transactions WHERE item_id = ? AND id NOT IN ("
+        "  SELECT id FROM transactions WHERE item_id = ? ORDER BY id DESC LIMIT 100"
+        ")"));
+    prune.addBindValue(itemId);
+    prune.addBindValue(itemId);
+    prune.exec();   // ignore failure – not critical
+
+    m_db.commit();
+
+    if (m_selectedStockId >= 0)
+        m_itemModel->reload(m_selectedStockId);
+    if (m_historyItemId == itemId)
+        m_historyModel->reload(itemId);
+    return true;
+}
+
+bool AppController::addColumn(const QString &name)
+{
+    if (m_selectedStockId < 0)
+        return false;
+
+    const QString trimmed = name.trimmed();
+    if (trimmed.isEmpty()) {
+        emit operationFailed(tr("Column name cannot be empty"));
+        return false;
+    }
+    if (trimmed.size() > kMaxColumnNameLength) {
+        emit operationFailed(tr("Column name can be at most %1 characters").arg(kMaxColumnNameLength));
+        return false;
+    }
+    const QString upper = trimmed.toUpper();
+    if (upper == QLatin1String("QTY") || upper == QLatin1String("NOTES") || upper == QLatin1String("ACTIONS")) {
+        emit operationFailed(tr("\"%1\" is already used by the table").arg(trimmed));
+        return false;
+    }
+
+    QSqlQuery q(m_db);
+    q.prepare(QStringLiteral("SELECT name FROM custom_columns WHERE stock_id = ?"));
+    q.addBindValue(m_selectedStockId);
+    int count = 0;
+    if (q.exec()) {
+        while (q.next()) {
+            ++count;
+            if (q.value(0).toString().compare(trimmed, Qt::CaseInsensitive) == 0) {
+                emit operationFailed(tr("A column named \"%1\" already exists").arg(trimmed));
+                return false;
+            }
+        }
+    }
+    if (count >= kMaxCustomColumns) {
+        emit operationFailed(tr("You can add at most %1 columns").arg(kMaxCustomColumns));
+        return false;
+    }
+
+    QSqlQuery ins(m_db);
+    ins.prepare(QStringLiteral("INSERT INTO custom_columns(stock_id, name, position) VALUES(?, ?, ?)"));
+    ins.addBindValue(m_selectedStockId);
+    ins.addBindValue(trimmed);
+    ins.addBindValue(count);
+    if (!ins.exec()) {
+        emit operationFailed(tr("Could not add column"));
+        return false;
+    }
+    m_itemModel->reload(m_selectedStockId);
+    return true;
+}
+
+bool AppController::adjustColumnValue(int itemId, int columnId, int delta, const QString &reason)
+{
+    if (reason.trimmed().isEmpty()) {
+        emit operationFailed(tr("A reason is required"));
+        return false;
+    }
+
+    m_db.transaction();
+    QSqlQuery q(m_db);
+
+    // the column must belong to the same stock as the item
+    q.prepare(QStringLiteral(
+        "SELECT 1 FROM items i JOIN custom_columns c ON c.stock_id = i.stock_id"
+        " WHERE i.id = ? AND c.id = ?"));
+    q.addBindValue(itemId);
+    q.addBindValue(columnId);
+    if (!q.exec() || !q.next()) {
+        m_db.rollback();
+        return false;
+    }
+
+    q.prepare(QStringLiteral("SELECT value FROM item_values WHERE item_id = ? AND column_id = ?"));
+    q.addBindValue(itemId);
+    q.addBindValue(columnId);
+    int current = 0;
+    if (q.exec() && q.next())
+        current = q.value(0).toInt();
+
+    const int after = current + delta;
+    if (after < 0) {
+        m_db.rollback();
+        emit operationFailed(tr("Not enough quantity (have %1)").arg(current));
+        return false;
+    }
+    if (after > kMaxColumnValue) {
+        m_db.rollback();
+        emit operationFailed(tr("Maximum value is %1").arg(kMaxColumnValue));
+        return false;
+    }
+
+    q.prepare(QStringLiteral(
+        "INSERT INTO item_values(item_id, column_id, value) VALUES(?, ?, ?)"
+        " ON CONFLICT(item_id, column_id) DO UPDATE SET value = excluded.value"));
+    q.addBindValue(itemId);
+    q.addBindValue(columnId);
+    q.addBindValue(after);
+    const bool ok1 = q.exec();
+    q.prepare(QStringLiteral(
+        "INSERT INTO transactions(item_id, delta, reason, quantity_after, column_id) VALUES(?, ?, ?, ?, ?)"));
+    q.addBindValue(itemId);
+    q.addBindValue(delta);
     q.addBindValue(reason.trimmed());
     q.addBindValue(after);
+    q.addBindValue(columnId);
     const bool ok2 = q.exec();
 
     if (ok1 && ok2) {
         m_db.commit();
     } else {
         m_db.rollback();
-        emit operationFailed(tr("Could not update quantity"));
+        emit operationFailed(tr("Could not update value"));
         return false;
     }
 

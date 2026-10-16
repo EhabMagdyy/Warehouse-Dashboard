@@ -22,8 +22,12 @@ ApplicationWindow {
 
     header: TitleBar {}
 
-    Shortcut { sequence: "Escape"; onActivated: { if (window.visibility === Window.FullScreen) window.visibility = Window.Maximized } }
-    Shortcut { sequence: "F11";    onActivated: window.visibility = (window.visibility === Window.FullScreen) ? Window.Maximized : Window.FullScreen }
+    // Only two states are allowed: full screen, or minimized (hidden in the taskbar).
+    // If the window manager ever restores it into a normal / maximized window, snap back.
+    onVisibilityChanged: {
+        if (window.visibility === Window.Windowed || window.visibility === Window.Maximized)
+            window.visibility = Window.FullScreen
+    }
 
     StackView {
         id: stack

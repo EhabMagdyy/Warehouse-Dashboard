@@ -89,3 +89,6 @@ target_link_libraries(appWarehouseDashboard PRIVATE Qt6::Quick Qt6::Sql Qt6::Cor
 if(WIN32)
     set_target_properties(appWarehouseDashboard PROPERTIES WIN32_EXECUTABLE TRUE)
 endif()
+
+# the built program is called WareDash (WareDash.exe on Windows)
+set_target_properties(appWarehouseDashboard PROPERTIES OUTPUT_NAME WareDash)

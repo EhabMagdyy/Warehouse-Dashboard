@@ -70,7 +70,24 @@ bool DatabaseManager::createSchema()
                 quantity_after INTEGER NOT NULL,
                 created_at TEXT NOT NULL DEFAULT (datetime('now','localtime'))
             ))"),
+        // user-defined numeric columns (max 3 per stock), shown after QTY
+        QStringLiteral(R"(
+            CREATE TABLE IF NOT EXISTS custom_columns(
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                stock_id INTEGER NOT NULL REFERENCES stocks(id) ON DELETE CASCADE,
+                name TEXT NOT NULL,
+                position INTEGER NOT NULL DEFAULT 0,
+                created_at TEXT NOT NULL DEFAULT (datetime('now','localtime'))
+            ))"),
+        QStringLiteral(R"(
+            CREATE TABLE IF NOT EXISTS item_values(
+                item_id INTEGER NOT NULL REFERENCES items(id) ON DELETE CASCADE,
+                column_id INTEGER NOT NULL REFERENCES custom_columns(id) ON DELETE CASCADE,
+                value INTEGER NOT NULL DEFAULT 0,
+                PRIMARY KEY(item_id, column_id)
+            ))"),
         QStringLiteral("CREATE INDEX IF NOT EXISTS idx_items_stock ON items(stock_id)"),
+        QStringLiteral("CREATE INDEX IF NOT EXISTS idx_cols_stock ON custom_columns(stock_id)"),
         QStringLiteral("CREATE INDEX IF NOT EXISTS idx_tx_item ON transactions(item_id)"),
     };
 
@@ -82,26 +99,31 @@ bool DatabaseManager::createSchema()
         }
     }
 
-    // Migration: databases created before the magic word existed lack these columns.
-    QSqlQuery info(m_db);
-    QStringList columns;
-    if (info.exec(QStringLiteral("PRAGMA table_info(users)"))) {
-        while (info.next())
-            columns << info.value(1).toString();
-    }
-    const QList<QPair<QString, QString>> migrations = {
-        { QStringLiteral("magic_salt"),       QStringLiteral("BLOB") },
-        { QStringLiteral("magic_hash"),       QStringLiteral("BLOB") },
-        { QStringLiteral("magic_iterations"), QStringLiteral("INTEGER") },
-    };
-    for (const auto &m : migrations) {
-        if (columns.contains(m.first))
-            continue;
+    // Migrations: add columns that older databases don't have yet.
+    auto addColumnIfMissing = [this](const QString &table, const QString &column, const QString &type) {
+        QSqlQuery info(m_db);
+        if (info.exec(QStringLiteral("PRAGMA table_info(%1)").arg(table))) {
+            while (info.next()) {
+                if (info.value(1).toString() == column)
+                    return true;
+            }
+        }
         QSqlQuery alter(m_db);
-        if (!alter.exec(QStringLiteral("ALTER TABLE users ADD COLUMN %1 %2").arg(m.first, m.second))) {
+        if (!alter.exec(QStringLiteral("ALTER TABLE %1 ADD COLUMN %2 %3").arg(table, column, type))) {
             qWarning() << "Migration error:" << alter.lastError().text();
             return false;
         }
-    }
+        return true;
+    };
+
+    // magic word (users)
+    if (!addColumnIfMissing(QStringLiteral("users"), QStringLiteral("magic_salt"),       QStringLiteral("BLOB"))
+        || !addColumnIfMissing(QStringLiteral("users"), QStringLiteral("magic_hash"),       QStringLiteral("BLOB"))
+        || !addColumnIfMissing(QStringLiteral("users"), QStringLiteral("magic_iterations"), QStringLiteral("INTEGER")))
+        return false;
+
+    // which column a history entry belongs to (NULL = QTY)
+    if (!addColumnIfMissing(QStringLiteral("transactions"), QStringLiteral("column_id"), QStringLiteral("INTEGER")))
+        return false;
     return true;
 }
